@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Thrive PD Live</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f4f8fb;
+      color: #18324a;
+    }
+
+    .container {
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .header h1 {
+      margin-bottom: 8px;
+      font-size: 2.4rem;
+    }
+
+    .header p {
+      margin-top: 0;
+      font-size: 1.1rem;
+      color: #52697d;
+    }
+
+    .question-card {
+      background: white;
+      border-radius: 18px;
+      padding: 28px;
+      margin-bottom: 24px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    #question {
+      margin-top: 0;
+      font-size: 1.8rem;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 14px;
+      border: 2px solid #cbd8e2;
+      border-radius: 12px;
+      font-size: 1rem;
+      resize: vertical;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #126fa3;
+      color: white;
+      font-size: 1.05rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0b5b88;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #message {
+      min-height: 24px;
+      margin-top: 12px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .responses-heading {
+      margin-top: 36px;
+      text-align: center;
+    }
+
+    #responses {
+      display: grid;
+      grid-template-columns: repeat(
+        auto-fit,
+        minmax(220px, 1fr)
+      );
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .response-card {
+      background: white;
+      border-left: 6px solid #14a9b8;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+      overflow-wrap: anywhere;
+    }
+
+    .response-card p {
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: #65798a;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Together, We Thrive</h1>
+      <p>Share your thinking with the team.</p>
+    </header>
+
+    <section class="question-card">
+      <h2 id="question">
+        What does thriving look like for our students?
+      </h2>
+
+      <form id="response-form">
+        <label for="response">
+          Type your response:
+        </label>
+
+        <textarea
+          id="response"
+          maxlength="300"
+          placeholder="Share one idea..."
+          required
+        ></textarea>
+
+        <button id="submit-button" type="submit">
+          Submit Response
+        </button>
+
+        <div id="message" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <h2 class="responses-heading">Our Responses</h2>
+
+    <section id="responses">
+      <p class="empty-state">
+        Responses will appear here.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("response-form");
+    const responseBox = document.getElementById("response");
+    const responses = document.getElementById("responses");
+    const message = document.getElementById("message");
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const text = responseBox.value.trim();
+
+      if (!text) {
+        message.textContent = "Please enter a response.";
+        return;
+      }
+
+      const emptyState = responses.querySelector(".empty-state");
+
+      if (emptyState) {
+        emptyState.remove();
+      }
+
+      const card = document.createElement("article");
+      card.className = "response-card";
+
+      const paragraph = document.createElement("p");
+      paragraph.textContent = text;
+
+      card.appendChild(paragraph);
+      responses.prepend(card);
+
+      responseBox.value = "";
+      message.textContent = "Your response was submitted.";
+
+      setTimeout(() => {
+        message.textContent = "";
+      }, 2500);
+    });
+  </script>
+</body>
+</html>
