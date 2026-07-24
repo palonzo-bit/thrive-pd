@@ -174,44 +174,159 @@
     </section>
   </main>
 
-  <script>
-    const form = document.getElementById("response-form");
-    const responseBox = document.getElementById("response");
-    const responses = document.getElementById("responses");
-    const message = document.getElementById("message");
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
+<script>
+  const SUPABASE_URL =
+    "https://tyckvaiesbnwqaidluaf.supabase.co";
 
-      const text = responseBox.value.trim();
+  const SUPABASE_KEY =
+    "sb_publishable_YnOegLQ0WmVnTG2raweTmQ_V1xjQWm2";
 
-      if (!text) {
-        message.textContent = "Please enter a response.";
-        return;
-      }
+  const supabaseClient = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
 
-      const emptyState = responses.querySelector(".empty-state");
+  const QUESTION_KEY = "thrive-opening";
 
-      if (emptyState) {
-        emptyState.remove();
-      }
+  const form = document.getElementById("response-form");
+  const responseBox = document.getElementById("response");
+  const responsesContainer =
+    document.getElementById("responses");
+  const message = document.getElementById("message");
+  const submitButton =
+    document.getElementById("submit-button");
 
-      const card = document.createElement("article");
-      card.className = "response-card";
+  function createResponseCard(response) {
+    const card = document.createElement("article");
+    card.className = "response-card";
+    card.dataset.responseId = response.id;
 
-      const paragraph = document.createElement("p");
-      paragraph.textContent = text;
+    const paragraph = document.createElement("p");
+    paragraph.textContent = response.response_text;
 
-      card.appendChild(paragraph);
-      responses.prepend(card);
+    card.appendChild(paragraph);
 
-      responseBox.value = "";
-      message.textContent = "Your response was submitted.";
+    return card;
+  }
 
-      setTimeout(() => {
-        message.textContent = "";
-      }, 2500);
+  function displayEmptyState() {
+    responsesContainer.innerHTML = `
+      <p class="empty-state">
+        Responses will appear here.
+      </p>
+    `;
+  }
+
+  function addResponseToScreen(response) {
+    const existingCard = document.querySelector(
+      `[data-response-id="${response.id}"]`
+    );
+
+    if (existingCard) {
+      return;
+    }
+
+    const emptyState =
+      responsesContainer.querySelector(".empty-state");
+
+    if (emptyState) {
+      emptyState.remove();
+    }
+
+    const card = createResponseCard(response);
+    responsesContainer.prepend(card);
+  }
+
+  async function loadResponses() {
+    const { data, error } = await supabaseClient
+      .from("responses")
+      .select("id, response_text, created_at")
+      .eq("question_key", QUESTION_KEY)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Unable to load responses:", error);
+      displayEmptyState();
+      return;
+    }
+
+    responsesContainer.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      displayEmptyState();
+      return;
+    }
+
+    data.forEach((response) => {
+      responsesContainer.appendChild(
+        createResponseCard(response)
+      );
     });
-  </script>
+  }
+
+  async function submitResponse(event) {
+    event.preventDefault();
+
+    const responseText = responseBox.value.trim();
+
+    if (!responseText) {
+      message.textContent = "Please enter a response.";
+      return;
+    }
+
+    submitButton.disabled = true;
+    message.textContent = "Submitting...";
+
+    const { error } = await supabaseClient
+      .from("responses")
+      .insert({
+        response_text: responseText,
+        question_key: QUESTION_KEY
+      });
+
+    if (error) {
+      console.error("Unable to submit response:", error);
+      message.textContent =
+        "Your response could not be submitted. Please try again.";
+      submitButton.disabled = false;
+      return;
+    }
+
+    responseBox.value = "";
+    message.textContent = "Your response was submitted.";
+    submitButton.disabled = false;
+
+    setTimeout(() => {
+      message.textContent = "";
+    }, 2500);
+  }
+
+  function subscribeToResponses() {
+    supabaseClient
+      .channel("live-thrive-responses")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "responses",
+          filter: `question_key=eq.${QUESTION_KEY}`
+        },
+        (payload) => {
+          addResponseToScreen(payload.new);
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime status:", status);
+      });
+  }
+
+  form.addEventListener("submit", submitResponse);
+
+  loadResponses();
+  subscribeToResponses();
+</script>
 </body>
 </html>
