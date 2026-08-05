@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>THRIVE Live Reflection</title>
+
+  <style>
+    :root {
+      --navy: #17324d;
+      --blue: #2f6d8c;
+      --teal: #4b9b94;
+      --cream: #f7f3e8;
+      --white: #ffffff;
+      --dark: #263238;
+      --border: #d7e0e4;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--cream);
+      color: var(--dark);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    header {
+      padding: 28px 20px;
+      background: linear-gradient(135deg, var(--navy), var(--blue));
+      color: white;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+    }
+
+    main {
+      width: min(680px, 92%);
+      margin: 26px auto 50px;
+    }
+
+    .card {
+      padding: 24px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .progress {
+      margin-bottom: 18px;
+      color: var(--blue);
+      font-weight: bold;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: var(--navy);
+      line-height: 1.3;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 14px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      border-color: var(--teal);
+      outline: 3px solid rgba(75, 155, 148, 0.18);
+    }
+
+    button {
+      width: 100%;
+      margin-top: 18px;
+      padding: 15px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--teal);
+      color: white;
+      font-size: 1.05rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    #message {
+      min-height: 24px;
+      margin-top: 16px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .success {
+      color: #17622c;
+    }
+
+    .error {
+      color: #9b1c1c;
+    }
+
+    .finished {
+      text-align: center;
+    }
+
+    .finished h2 {
+      font-size: 2rem;
+    }
+
+    .privacy {
+      margin-top: 18px;
+      color: #66747a;
+      font-size: 0.88rem;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>THRIVE Live Reflection</h1>
+
+    <p>
+      Submit one response at a time as we move through the discussion.
+    </p>
+  </header>
+
+  <main>
+    <section class="card" id="activityCard">
+      <div class="progress" id="progress"></div>
+
+      <h2 id="questionText"></h2>
+
+      <textarea
+        id="answer"
+        maxlength="1000"
+        placeholder="Type your response here..."
+      ></textarea>
+
+      <button id="submitButton">
+        Submit and Continue
+      </button>
+
+      <div
+        id="message"
+        role="status"
+        aria-live="polite"
+      ></div>
+
+      <p class="privacy">
+        Please do not include student names or confidential personnel
+        information.
+      </p>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+    import {
+      getAuth,
+      signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+    import {
+      getDatabase,
+      ref,
+      push,
+      set,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDs81YP4w9BGQ50wFLmw1OY_8q8D1lZwKE",
+      authDomain: "thrive-pd-feedback.firebaseapp.com",
+      databaseURL:
+        "https://thrive-pd-feedback-default-rtdb.firebaseio.com",
+      projectId: "thrive-pd-feedback",
+      storageBucket: "thrive-pd-feedback.firebasestorage.app",
+      messagingSenderId: "51558680904",
+      appId: "1:51558680904:web:620bea08fb2d2174434b7d",
+      measurementId: "G-N7YYL11E0J"
+    };
+
+    const questions = [
+      {
+        id: "contributing-factors",
+        text: "What were the greatest contributing factors?"
+      },
+      {
+        id: "stressors",
+        text: "What were the greatest stressors, aside from time?"
+      },
+      {
+        id: "do-differently",
+        text: "What would you do differently?"
+      },
+      {
+        id: "worked-but-loose",
+        text: "What worked well but felt loose?"
+      },
+      {
+        id: "nonnegotiable",
+        text: "What is nonnegotiable for next time?"
+      }
+    ];
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const database = getDatabase(app);
+
+    const questionText = document.getElementById("questionText");
+    const progress = document.getElementById("progress");
+    const answer = document.getElementById("answer");
+    const submitButton = document.getElementById("submitButton");
+    const message = document.getElementById("message");
+    const activityCard = document.getElementById("activityCard");
+
+    let currentQuestion = 0;
+    let connected = false;
+
+    function showQuestion() {
+      const question = questions[currentQuestion];
+
+      progress.textContent =
+        `Question ${currentQuestion + 1} of ${questions.length}`;
+
+      questionText.textContent = question.text;
+      answer.value = "";
+      answer.focus();
+
+      submitButton.textContent =
+        currentQuestion === questions.length - 1
+          ? "Submit Final Response"
+          : "Submit and Continue";
+    }
+
+    function showMessage(text, type = "") {
+      message.textContent = text;
+      message.className = type;
+    }
+
+    async function connect() {
+      try {
+        await signInAnonymously(auth);
+        connected = true;
+        showQuestion();
+      } catch (error) {
+        console.error(error);
+
+        showMessage(
+          "The form could not connect. Refresh the page and try again.",
+          "error"
+        );
+      }
+    }
+
+    submitButton.addEventListener("click", async () => {
+      const responseText = answer.value.trim();
+
+      if (!responseText) {
+        showMessage(
+          "Please enter a response before continuing.",
+          "error"
+        );
+
+        return;
+      }
+
+      if (!connected) {
+        showMessage(
+          "The form is still connecting. Please wait and try again.",
+          "error"
+        );
+
+        return;
+      }
+
+      submitButton.disabled = true;
+      showMessage("Submitting...");
+
+      const question = questions[currentQuestion];
+
+      try {
+        const responseRef = push(
+          ref(database, "liveResponses")
+        );
+
+        await set(responseRef, {
+          question: question.id,
+          answer: responseText,
+          submittedAt: serverTimestamp()
+        });
+
+        showMessage("Response submitted!", "success");
+
+        currentQuestion += 1;
+
+        if (currentQuestion < questions.length) {
+          setTimeout(() => {
+            showMessage("");
+            submitButton.disabled = false;
+            showQuestion();
+          }, 700);
+        } else {
+          activityCard.innerHTML = `
+            <div class="finished">
+              <h2>Thank you!</h2>
+              <p>Your responses have been submitted.</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error(error);
+
+        showMessage(
+          "The response did not submit. Please try again.",
+          "error"
+        );
+
+        submitButton.disabled = false;
+      }
+    });
+
+    connect();
+  </script>
+</body>
+</html>
