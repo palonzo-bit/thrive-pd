@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>THRIVE Response Wall</title>
+
+  <style>
+    :root {
+      --navy: #17324d;
+      --blue: #2f6d8c;
+      --teal: #4b9b94;
+      --cream: #f7f3e8;
+      --white: #ffffff;
+      --dark: #263238;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--cream);
+      color: var(--dark);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    header {
+      padding: 28px 40px;
+      background: linear-gradient(135deg, var(--navy), var(--blue));
+      color: white;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 2.4rem;
+    }
+
+    #progress {
+      margin-top: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      opacity: 0.9;
+    }
+
+    #question {
+      max-width: 1100px;
+      margin: 18px auto 0;
+      font-size: 2rem;
+      line-height: 1.25;
+    }
+
+    .count {
+      margin-top: 14px;
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+
+    main {
+      width: min(1400px, 94%);
+      margin: 28px auto 50px;
+    }
+
+    #responses {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+
+    .response-card {
+      padding: 20px;
+      background: white;
+      border-radius: 14px;
+      border-top: 6px solid var(--teal);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+      font-size: 1.15rem;
+      line-height: 1.45;
+      animation: appear 0.35s ease;
+      overflow-wrap: anywhere;
+    }
+
+    .empty {
+      grid-column: 1 / -1;
+      padding: 50px;
+      background: white;
+      border-radius: 16px;
+      text-align: center;
+      font-size: 1.4rem;
+      color: #66747a;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>THRIVE Cohort Reflection</h1>
+
+    <div id="progress">Connecting…</div>
+
+    <div id="question">
+      Loading question…
+    </div>
+
+    <div class="count" id="count">
+      0 responses
+    </div>
+  </header>
+
+  <main>
+    <div id="responses">
+      <div class="empty">
+        Responses will appear here as staff submit.
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+    import {
+      getAuth,
+      signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+    import {
+      getDatabase,
+      ref,
+      onValue,
+      query,
+      orderByChild,
+      equalTo
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+    const firebaseConfig = {
+      const firebaseConfig = {
+  apiKey: "AIzaSyDs81YP4w9BGQ50wFLmw1OY_8q8DllZwKE",
+  authDomain: "thrive-pd-feedback.firebaseapp.com",
+  databaseURL: "https://thrive-pd-feedback-default-rtdb.firebaseio.com",
+  projectId: "thrive-pd-feedback",
+  storageBucket: "thrive-pd-feedback.firebasestorage.app",
+  messagingSenderId: "51558680904",
+  appId: "1:51558680904:web:620bea08fb2d2174434b7d",
+  measurementId: "G-N7YYL11E0J"
+};
+
+    };
+
+    const questions = [
+      {
+        id: "contributing-factors",
+        text: "What were the greatest contributing factors?"
+      },
+      {
+        id: "stressors",
+        text: "What were the greatest stressors, aside from time?"
+      },
+      {
+        id: "do-differently",
+        text: "What would you do differently?"
+      },
+      {
+        id: "worked-but-loose",
+        text: "What worked well but felt loose?"
+      },
+      {
+        id: "nonnegotiable",
+        text: "What is nonnegotiable for next time?"
+      }
+    ];
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const database = getDatabase(app);
+
+    const progressElement =
+      document.getElementById("progress");
+
+    const questionElement =
+      document.getElementById("question");
+
+    const countElement =
+      document.getElementById("count");
+
+    const responsesElement =
+      document.getElementById("responses");
+
+    let stopResponseListener = null;
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function displayResponses(snapshot) {
+      const responses = [];
+
+      snapshot.forEach((childSnapshot) => {
+        const response = childSnapshot.val();
+
+        if (response && response.answer) {
+          responses.push(response);
+        }
+      });
+
+      countElement.textContent =
+        `${responses.length} response${responses.length === 1 ? "" : "s"}`;
+
+      if (responses.length === 0) {
+        responsesElement.innerHTML = `
+          <div class="empty">
+            Responses will appear here as staff submit.
+          </div>
+        `;
+
+        return;
+      }
+
+      responsesElement.innerHTML = responses
+        .map((response) => `
+          <article class="response-card">
+            ${escapeHtml(response.answer)}
+          </article>
+        `)
+        .join("");
+    }
+
+    async function start() {
+      try {
+        await signInAnonymously(auth);
+
+        const activeQuestionRef =
+          ref(database, "session/activeQuestion");
+
+        onValue(activeQuestionRef, (snapshot) => {
+          const questionNumber = snapshot.val();
+
+          if (
+            !Number.isInteger(questionNumber) ||
+            questionNumber < 0 ||
+            questionNumber >= questions.length
+          ) {
+            progressElement.textContent =
+              "Waiting to begin";
+
+            questionElement.textContent =
+              "Waiting for the facilitator to begin.";
+
+            countElement.textContent =
+              "0 responses";
+
+            responsesElement.innerHTML = `
+              <div class="empty">
+                The live reflection has not started yet.
+              </div>
+            `;
+
+            return;
+          }
+
+          const activeQuestion =
+            questions[questionNumber];
+
+          progressElement.textContent =
+            `Question ${questionNumber + 1} of ${questions.length}`;
+
+          questionElement.textContent =
+            activeQuestion.text;
+
+          if (stopResponseListener) {
+            stopResponseListener();
+          }
+
+          const responsesQuery = query(
+            ref(database, "liveResponses"),
+            orderByChild("question"),
+            equalTo(activeQuestion.id)
+          );
+
+          stopResponseListener = onValue(
+            responsesQuery,
+            displayResponses
+          );
+        });
+      } catch (error) {
+        console.error(error);
+
+        progressElement.textContent =
+          "Connection error";
+
+        questionElement.textContent =
+          "Unable to connect to the live reflection.";
+
+        responsesElement.innerHTML = `
+          <div class="empty">
+            Refresh this page after checking the Firebase setup.
+          </div>
+        `;
+      }
+    }
+
+    start();
+  </script>
+</body>
+</html>
