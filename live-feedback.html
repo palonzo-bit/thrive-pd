@@ -181,12 +181,13 @@
     } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
     import {
-      getDatabase,
-      ref,
-      push,
-      set,
-      serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+  getDatabase,
+  ref,
+  push,
+  set,
+  onValue,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
   // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
@@ -235,23 +236,25 @@ const firebaseConfig = {
     const activityCard = document.getElementById("activityCard");
 
     let currentQuestion = 0;
-    let connected = false;
+let connected = false;
+let hasSubmittedCurrentQuestion = false;
 
     function showQuestion() {
-      const question = questions[currentQuestion];
+  const question = questions[currentQuestion];
 
-      progress.textContent =
-        `Question ${currentQuestion + 1} of ${questions.length}`;
+  progress.textContent =
+    `Question ${currentQuestion + 1} of ${questions.length}`;
 
-      questionText.textContent = question.text;
-      answer.value = "";
-      answer.focus();
+  questionText.textContent = question.text;
+  answer.value = "";
+  answer.disabled = false;
+  submitButton.disabled = false;
+  submitButton.textContent = "Submit Response";
+  hasSubmittedCurrentQuestion = false;
 
-      submitButton.textContent =
-        currentQuestion === questions.length - 1
-          ? "Submit Final Response"
-          : "Submit and Continue";
-    }
+  showMessage("");
+  answer.focus();
+}
 
     function showMessage(text, type = "") {
       message.textContent = text;
@@ -261,8 +264,22 @@ const firebaseConfig = {
     async function connect() {
       try {
         await signInAnonymously(auth);
-        connected = true;
-        showQuestion();
+connected = true;
+
+const activeQuestionRef = ref(database, "session/activeQuestion");
+
+onValue(activeQuestionRef, (snapshot) => {
+  const questionNumber = snapshot.val();
+
+  if (
+    Number.isInteger(questionNumber) &&
+    questionNumber >= 0 &&
+    questionNumber < questions.length
+  ) {
+    currentQuestion = questionNumber;
+    showQuestion();
+  }
+});
       } catch (error) {
         console.error(error);
 
@@ -310,23 +327,15 @@ const firebaseConfig = {
           submittedAt: serverTimestamp()
         });
 
-        showMessage("Response submitted!", "success");
+        hasSubmittedCurrentQuestion = true;
+answer.disabled = true;
+submitButton.disabled = true;
+submitButton.textContent = "Response Submitted";
 
-        currentQuestion += 1;
-
-        if (currentQuestion < questions.length) {
-          setTimeout(() => {
-            showMessage("");
-            submitButton.disabled = false;
-            showQuestion();
-          }, 700);
-        } else {
-          activityCard.innerHTML = `
-            <div class="finished">
-              <h2>Thank you!</h2>
-              <p>Your responses have been submitted.</p>
-            </div>
-          `;
+showMessage(
+  "Response submitted. Please wait for the next question.",
+  "success"
+);
         }
       } catch (error) {
         console.error(error);
